@@ -9,6 +9,8 @@ from sklearn.metrics import root_mean_squared_error
 from sklearn.feature_extraction import DictVectorizer
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 
+#.\.venv\Scripts\Activate
+
 @task(name="Read Data", retries=4, retry_delay_seconds=[1, 4, 8, 16])
 def read_data(file_path: str) -> pd.DataFrame:
     """Read data into DataFrame"""
@@ -117,7 +119,7 @@ def hyper_parameter_tunning(X_train, X_val, y_train, y_val, dv):
 def train_best_model(X_train, X_val, y_train, y_val, dv, best_params) -> None:
     """train a model with best hyperparams and write everything out"""
 
-    with mlflow.start_run("Best model ever"):
+    with mlflow.start_run(run_name="Best model ever"):
         train = xgb.DMatrix(X_train, label=y_train)
         valid = xgb.DMatrix(X_val, label=y_val)
 
@@ -144,15 +146,15 @@ def train_best_model(X_train, X_val, y_train, y_val, dv, best_params) -> None:
     
     return None
 
-@task(name="Main Flow")
+@flow(name="Main Flow")
 def main_flow(year: str, month_train: str, month_val: str) -> None:
     """The main training pipeline"""
     
-    train_path = f"../data/green_tripdata_{year}-{month_train}.parquet",
-    val_path = f"../data/green_tripdata_{year}-{month_val}.parquet",
+    train_path = f"../data/green_tripdata_{year}-{month_train}.parquet"
+    val_path = f"../data/green_tripdata_{year}-{month_val}.parquet"
     
     # MLflow settings
-    dagshub.init(url="https://dagshub.com/zapatacc/nyc-taxi-time-prediction", mlflow=True)
+    dagshub.init(url="https://dagshub.com/diego-mercadoc/nyc-taxi-time-prediction", mlflow=True)
     
     MLFLOW_TRACKING_URI = mlflow.get_tracking_uri()
     
@@ -173,3 +175,7 @@ def main_flow(year: str, month_train: str, month_val: str) -> None:
     train_best_model(X_train, X_val, y_train, y_val, dv, best_params)
 
 main_flow("2024", "01", "02")
+
+# activate the virtual environment
+# python -m venv .venv
+# cd "training pipeline"

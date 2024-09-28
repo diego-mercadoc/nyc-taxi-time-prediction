@@ -171,6 +171,8 @@ def register_best_model():
     # Registrar EL MODELOO MODEL REGSITRY
     registered_model = mlflow.register_model(model_uri=model_uri, name=model_name)
 
+    print(f"Asignando el alias 'champion' al modelo '{model_name}', versión '{registered_model.version}'")
+
     # Asignar el alias '@champion' a la versión registrada del modelo
     client.set_registered_model_alias(
         name=model_name,

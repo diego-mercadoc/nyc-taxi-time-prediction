@@ -5,7 +5,7 @@ import dagshub
 import pandas as pd
 import xgboost as xgb
 from hyperopt.pyll import scope
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import root_mean_squared_error
 from sklearn.feature_extraction import DictVectorizer
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
 from prefect import task, flow  # Importar task y flow desde prefect PARA QUE JALE EL CODIGO
@@ -82,7 +82,7 @@ def hyper_parameter_tuning(X_train, X_val, y_train, y_val, dv):
             )
             
             y_pred = booster.predict(valid)
-            rmse = mean_squared_error(y_val, y_pred, squared=False)
+            rmse = root_mean_squared_error(y_val, y_pred, squared=False)
             
             mlflow.log_metric("rmse", rmse)
     

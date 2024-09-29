@@ -5,14 +5,20 @@ import dagshub
 import pandas as pd
 import xgboost as xgb
 from hyperopt.pyll import scope
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import root_mean_squared_error
 from sklearn.feature_extraction import DictVectorizer
 from hyperopt import fmin, tpe, hp, STATUS_OK, Trials
-from prefect import task, flow  # Importar task y flow desde Prefect
+from prefect import task, flow  # Importar task y flow desde prefect PARA QUE JALE EL CODIGO
+from mlflow.tracking import MlflowClient  # Importar mlflowclient para hablar con mlefloe
+import matplotlib
+matplotlib.use('Agg')  # Para que no se abra la ventana de matplotlib
 
 # Activar el entorno virtual
 # .\.venv\Scripts\Activate
 # prefect server start
+
+# Lw wa poner N_JOBS = -1 para que CORRA COMO BESTIA
+N_JOBS = -1
 
 @task(name="Read Data", retries=4, retry_delay_seconds=[1, 4, 8, 16])
 def read_data(file_path: str) -> pd.DataFrame:
@@ -64,6 +70,9 @@ def hyper_parameter_tuning(X_train, X_val, y_train, y_val, dv):
         with mlflow.start_run(nested=True):
             mlflow.set_tag("model_family", "xgboost")
             
+            # Ponerle N_JOBS = -1 para que corra como bestia (X2 xd) EL ENTRENAMIENTO
+            params["n_jobs"] = N_JOBS
+
             booster = xgb.train(
                 params=params,
                 dtrain=train,
@@ -73,7 +82,7 @@ def hyper_parameter_tuning(X_train, X_val, y_train, y_val, dv):
             )
             
             y_pred = booster.predict(valid)
-            rmse = mean_squared_error(y_val, y_pred, squared=False)
+            rmse = root_mean_squared_error(y_val, y_pred, squared=False)
             
             mlflow.log_metric("rmse", rmse)
     
@@ -87,7 +96,8 @@ def hyper_parameter_tuning(X_train, X_val, y_train, y_val, dv):
             'reg_lambda': hp.loguniform('reg_lambda', -6, -1),
             'min_child_weight': hp.loguniform('min_child_weight', -1, 3),
             'objective': 'reg:squarederror',
-            'seed': 42
+            'seed': 42,
+            'n_jobs': N_JOBS # Ponerle N_JOBS = -1 para LA OPTIMIZACION DE HypParams, que corra como bestia (X2 xd)
         }
         
         best_params = fmin(
@@ -100,6 +110,7 @@ def hyper_parameter_tuning(X_train, X_val, y_train, y_val, dv):
         best_params["max_depth"] = int(best_params["max_depth"])
         best_params["seed"] = 42
         best_params["objective"] = "reg:squarederror"
+        best_params["n_jobs"] = N_JOBS # N_JOBS = -1 a LOS MEJORES PARAMETROS
         
         mlflow.log_params(best_params)
 
@@ -130,8 +141,44 @@ def train_best_model(X_train, X_val, y_train, y_val, dv, best_params):
             pickle.dump(dv, f_out)
         
         mlflow.log_artifact("models/preprocessor.b", artifact_path="preprocessor")
-    
+
+        # Loguear el modelo entrenado apa registralo luegoo
+        mlflow.xgboost.log_model(booster, artifact_path="model") 
+
     return None
+
+# La nuevaa tarea para registrar el best model MODEL REGSSTRY
+@task(name="Register Best Model")
+def register_best_model():
+    client = MlflowClient()  # Craear el cliente para hablar con mlefloew
+
+    experiment_name = "nyc-taxi-experiment-prefect"
+    experiment = client.get_experiment_by_name(experiment_name)
+
+    # Buscar el run con el RMSE mass bajo
+    runs = client.search_runs(
+        experiment_ids=[experiment.experiment_id],
+        order_by=["metrics.rmse ASC"],
+        max_results=1
+    )
+
+    best_run = runs[0]
+    run_id = best_run.info.run_id  # Sacart el run_id automaticamente COMO EN LA TAREA
+
+    model_uri = f"runs:/{run_id}/model"
+    model_name = "nyc-taxi-model-prefect"  # Nombre del modelo en el model registry
+
+    # Registrar EL MODELOO MODEL REGSITRY
+    registered_model = mlflow.register_model(model_uri=model_uri, name=model_name)
+
+    print(f"Asignando el alias 'champion' al modelo '{model_name}', versión '{registered_model.version}'")
+
+    # Asignar el alias '@champion' a la versión registrada del modelo
+    client.set_registered_model_alias(
+        name=model_name,
+        alias="champion",
+        version=registered_model.version
+    )
 
 @flow(name="Main Flow")
 def main_flow(year: str, month_train: str, month_val: str):
@@ -153,5 +200,7 @@ def main_flow(year: str, month_train: str, month_val: str):
     best_params = hyper_parameter_tuning(X_train, X_val, y_train, y_val, dv)
     
     train_best_model(X_train, X_val, y_train, y_val, dv, best_params)
+    
+    register_best_model()  # Aqui le Hablamso a la NEW TASK para registrar el BEST MODE;L
 
 main_flow("2024", "01", "02")

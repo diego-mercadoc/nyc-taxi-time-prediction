@@ -25,7 +25,7 @@ services:
       context: ./model  # Carpeta que contiene los archivos para construir la imagen del backend
       dockerfile: Dockerfile  # Nombre del Dockerfile, relativo al contexto especificado
     ports:
-      - "7000:7000"  # Mapea el puerto 8000 del host al puerto 8000 del contenedor
+      - "8000:8000"  # Mapea el puerto 8000 del host al puerto 8000 del contenedor
     networks:
       - nyc-taxi-network  # Conecta este servicio a la red definida
 

@@ -3,3 +3,4 @@ uvicorn
 mlflow
 pydantic
 requests
+xgboost

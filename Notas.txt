@@ -1,0 +1,9 @@
+? Would you like to save configuration for this deployment for faster deployments in the future? [y/n]: n
+
+To execute flow runs from this deployment, start a worker in a separate terminal that pulls work from the 'workpool-test' work pool:        
+
+        $ prefect worker start --pool 'workpool-test'
+
+To schedule a run for this deployment, use the following command:
+
+        $ prefect deployment run 'Main Flow/deploy-nyc-taxi

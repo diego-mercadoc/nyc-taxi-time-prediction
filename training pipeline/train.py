@@ -133,7 +133,7 @@ def train_best_model(X_train, X_val, y_train, y_val, dv, best_params):
         )
 
         y_pred = booster.predict(valid)
-        rmse = mean_squared_error(y_val, y_pred, squared=False)
+        rmse = root_mean_squared_error(y_val, y_pred, squared=False)
         mlflow.log_metric("rmse", rmse)
 
         pathlib.Path("models").mkdir(exist_ok=True)
